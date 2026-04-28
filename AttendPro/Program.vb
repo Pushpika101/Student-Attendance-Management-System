@@ -1,30 +1,38 @@
 Imports MySql.Data.MySqlClient
 Imports System.IO
+Imports System.Security.Cryptography
+Imports System.Text
 
 Module Program
 
     Dim connectionString As String = "server=localhost;user=root;password=;database=attendpro_db;"
 
     Sub Main(args As String())
-        Console.WriteLine("ATTENDPRO - Login")
-        Console.Write("Username: ")
-        Dim username As String = Console.ReadLine()
+        Do
+            Console.Clear()
+            Console.WriteLine("ATTENDPRO - Login")
 
-        Console.Write("Password: ")
-        Dim password As String = Console.ReadLine()
+            Console.Write("Username: ")
+            Dim username As String = Console.ReadLine()
 
-        Dim role As String = Login(username, password)
+            Console.Write("Password: ")
+            Dim password As String = ReadPassword()
 
-        If role <> "" Then
-            Console.WriteLine("Login successful.")
-            Console.WriteLine("Role: " & role)
+            Dim role As String = Login(username, password)
 
-            ShowMenu(role)
-        Else
-            Console.WriteLine("Invalid username or password.")
-        End If
+            If role <> "" Then
+                Console.WriteLine("Login successful.")
+                Console.WriteLine("Role: " & role)
 
-        Console.ReadLine()
+                ShowMenu(role)
+            Else
+                Console.WriteLine("Invalid username or password.")
+                Console.WriteLine("Press Enter to try again...")
+                Console.ReadLine()
+            End If
+
+        Loop
+
     End Sub
 
     Function Login(username As String, password As String) As String
@@ -36,7 +44,7 @@ Module Program
 
                 Using cmd As New MySqlCommand(query, conn)
                     cmd.Parameters.AddWithValue("@username", username)
-                    cmd.Parameters.AddWithValue("@password", password)
+                    cmd.Parameters.AddWithValue("@password", HashPassword(password))
 
                     Dim result = cmd.ExecuteScalar()
 
@@ -150,8 +158,32 @@ Module Program
         Console.Write("Course ID: ")
         Dim courseId As String = Console.ReadLine()
 
-        Console.Write("Date (YYYY-MM-DD): ")
-        Dim attendanceDate As String = Console.ReadLine()
+        If Not RecordExists("students", "student_id", studentId) Then
+            Console.WriteLine("Student ID does not exist.")
+            Return
+        End If
+
+        If Not RecordExists("courses", "course_id", courseId) Then
+            Console.WriteLine("Course ID does not exist.")
+            Return
+        End If
+
+        Dim attendanceDate As String = ""
+
+        Do
+            Console.Write("Date (YYYY-MM-DD): ")
+            attendanceDate = Console.ReadLine()
+
+            If Not IsValidDate(attendanceDate) Then
+                Console.WriteLine("Invalid date format. Example: 2026-04-28")
+            End If
+
+        Loop While Not IsValidDate(attendanceDate)
+
+        If AttendanceAlreadyMarked(studentId, courseId, attendanceDate) Then
+            Console.WriteLine("Attendance already marked for this student, course, and date.")
+            Return
+        End If
 
         Dim status As String = ""
 
@@ -186,6 +218,101 @@ Module Program
 
         Catch ex As Exception
             Console.WriteLine("Error marking attendance: " & ex.Message)
+        End Try
+    End Sub
+
+    Sub UpdateAttendance()
+        Console.WriteLine()
+        Console.WriteLine("Update Attendance Status")
+
+        Console.Write("Student ID: ")
+        Dim studentId As String = Console.ReadLine()
+
+        Console.Write("Course ID: ")
+        Dim courseId As String = Console.ReadLine()
+
+        Console.Write("Date (YYYY-MM-DD): ")
+        Dim attendanceDate As String = Console.ReadLine()
+
+        If Not AttendanceAlreadyMarked(studentId, courseId, attendanceDate) Then
+            Console.WriteLine("No attendance record found for this student, course, and date.")
+            Return
+        End If
+
+        Dim status As String = ""
+
+        Do
+            Console.Write("New Status (Present/Absent/Late): ")
+            status = Console.ReadLine()
+
+            If Not IsValidStatus(status) Then
+                Console.WriteLine("Invalid status. Please enter Present, Absent, or Late.")
+            End If
+
+        Loop While Not IsValidStatus(status)
+
+        Try
+            Using conn As New MySqlConnection(connectionString)
+                conn.Open()
+
+                Dim query As String =
+                    "UPDATE attendance SET status=@status " &
+                    "WHERE student_id=@student_id AND course_id=@course_id AND attendance_date=@date"
+
+                Using cmd As New MySqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@status", status.Trim())
+                    cmd.Parameters.AddWithValue("@student_id", studentId)
+                    cmd.Parameters.AddWithValue("@course_id", courseId)
+                    cmd.Parameters.AddWithValue("@date", attendanceDate)
+
+                    cmd.ExecuteNonQuery()
+                    Console.WriteLine("Attendance updated successfully.")
+                End Using
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine("Error updating attendance: " & ex.Message)
+        End Try
+    End Sub
+
+    Sub DeleteAttendance()
+        Console.WriteLine()
+        Console.WriteLine("Delete Attendance Record")
+
+        Console.Write("Student ID: ")
+        Dim studentId As String = Console.ReadLine()
+
+        Console.Write("Course ID: ")
+        Dim courseId As String = Console.ReadLine()
+
+        Console.Write("Date (YYYY-MM-DD): ")
+        Dim attendanceDate As String = Console.ReadLine()
+
+        If Not AttendanceAlreadyMarked(studentId, courseId, attendanceDate) Then
+            Console.WriteLine("No attendance record found.")
+            Return
+        End If
+
+        Try
+            Using conn As New MySqlConnection(connectionString)
+                conn.Open()
+
+                Dim query As String =
+                    "DELETE FROM attendance " &
+                    "WHERE student_id=@student_id AND course_id=@course_id AND attendance_date=@date"
+
+                Using cmd As New MySqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@student_id", studentId)
+                    cmd.Parameters.AddWithValue("@course_id", courseId)
+                    cmd.Parameters.AddWithValue("@date", attendanceDate)
+
+                    cmd.ExecuteNonQuery()
+                    Console.WriteLine("Attendance record deleted successfully.")
+                End Using
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine("Error deleting attendance: " & ex.Message)
         End Try
     End Sub
 
@@ -266,7 +393,12 @@ Module Program
                 Console.WriteLine("13. Export Attendance Report")
                 Console.WriteLine("14. Low Attendance Report")
                 Console.WriteLine("15. Date-wise Attendance Report")
-                Console.WriteLine("16. Exit")
+                Console.WriteLine("16. Update Attendance")
+                Console.WriteLine("17. Delete Attendance")
+                Console.WriteLine("18. Search Student")
+                Console.WriteLine("19. Search Course")
+                Console.WriteLine("20. Logout")
+                Console.WriteLine("21. Exit")
             Else
                 Console.WriteLine("1. View Students")
                 Console.WriteLine("2. View Courses")
@@ -275,7 +407,12 @@ Module Program
                 Console.WriteLine("5. Date-wise Attendance Report")
                 Console.WriteLine("6. Low Attendance Report")
                 Console.WriteLine("7. Export Attendance Report")
-                Console.WriteLine("8. Exit")
+                Console.WriteLine("8. Update Attendance")
+                Console.WriteLine("9. Delete Attendance")
+                Console.WriteLine("10. Search Student")
+                Console.WriteLine("11. Search Course")
+                Console.WriteLine("12. Logout")
+                Console.WriteLine("13. Exit")
             End If
 
             Console.Write("Enter your choice: ")
@@ -314,6 +451,20 @@ Module Program
                     Case "15"
                         DateWiseAttendanceReport()
                     Case "16"
+                        UpdateAttendance()
+                    
+                    Case "17"
+                        DeleteAttendance()
+                    
+                    Case "18"
+                        SearchStudent()
+                    
+                    Case "19"
+                        SearchCourse()
+                    
+                    Case "20"
+                        Console.WriteLine("Logging out...")
+                    Case "21"
                         Console.WriteLine("Exiting system...")
                     Case Else
                         Console.WriteLine("Invalid choice.")
@@ -335,13 +486,25 @@ Module Program
                     Case "7"
                         ExportAttendanceReport()
                     Case "8"
+                        UpdateAttendance()
+                    
+                    Case "9"
+                        SearchStudent()
+                    Case "10"
+                        DeleteAttendance()
+                    
+                    Case "11"
+                        SearchCourse()
+                    Case "12"
+                        Console.WriteLine("Logging out...")
+                    Case "13"
                         Console.WriteLine("Exiting system...")
                     Case Else
                         Console.WriteLine("Invalid choice.")
                 End Select
             End If
 
-        Loop While Not ((role.ToLower() = "admin" And choice = "16") Or (role.ToLower() <> "admin" And choice = "8"))
+        Loop While Not ((role.ToLower() = "admin" And choice = "20") Or (role.ToLower() <> "admin" And choice = "12"))
     End Sub
 
     Sub ViewStudents()
@@ -368,6 +531,90 @@ Module Program
 
         Catch ex As Exception
             Console.WriteLine("Error loading students: " & ex.Message)
+        End Try
+    End Sub
+
+    Sub SearchStudent()
+        Console.WriteLine()
+        Console.WriteLine("Search Student")
+
+        Console.Write("Enter Student ID or Name: ")
+        Dim keyword As String = Console.ReadLine()
+
+        Try
+            Using conn As New MySqlConnection(connectionString)
+                conn.Open()
+
+                Dim query As String =
+                    "SELECT student_id, full_name, course_year, contact_info " &
+                    "FROM students " &
+                    "WHERE student_id LIKE @keyword OR full_name LIKE @keyword"
+
+                Using cmd As New MySqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@keyword", "%" & keyword & "%")
+
+                    Using reader As MySqlDataReader = cmd.ExecuteReader()
+                        Dim found As Boolean = False
+
+                        While reader.Read()
+                            found = True
+                            Console.WriteLine(reader("student_id") & " | " &
+                                              reader("full_name") & " | " &
+                                              reader("course_year") & " | " &
+                                              reader("contact_info"))
+                        End While
+
+                        If Not found Then
+                            Console.WriteLine("No matching student found.")
+                        End If
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine("Error searching student: " & ex.Message)
+        End Try
+    End Sub
+
+    Sub SearchCourse()
+        Console.WriteLine()
+        Console.WriteLine("Search Course")
+
+        Console.Write("Enter Course ID or Course Name: ")
+        Dim keyword As String = Console.ReadLine()
+
+        Try
+            Using conn As New MySqlConnection(connectionString)
+                conn.Open()
+
+                Dim query As String =
+                    "SELECT course_id, course_name, lecturer_name, hall_number " &
+                    "FROM courses " &
+                    "WHERE course_id LIKE @keyword OR course_name LIKE @keyword"
+
+                Using cmd As New MySqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@keyword", "%" & keyword & "%")
+
+                    Using reader As MySqlDataReader = cmd.ExecuteReader()
+                        Dim found As Boolean = False
+
+                        While reader.Read()
+                            found = True
+                            Console.WriteLine(reader("course_id") & " | " &
+                                              reader("course_name") & " | " &
+                                              reader("lecturer_name") & " | " &
+                                              reader("hall_number"))
+                        End While
+
+                        If Not found Then
+                            Console.WriteLine("No matching course found.")
+                        End If
+                    End Using
+                End Using
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine("Error searching course: " & ex.Message)
         End Try
     End Sub
 
@@ -585,7 +832,7 @@ Module Program
 
                 Using cmd As New MySqlCommand(query, conn)
                     cmd.Parameters.AddWithValue("@username", username)
-                    cmd.Parameters.AddWithValue("@password", password)
+                    cmd.Parameters.AddWithValue("@password", HashPassword(password))
                     cmd.Parameters.AddWithValue("@role", role)
 
                     cmd.ExecuteNonQuery()
@@ -775,6 +1022,98 @@ Module Program
         status = status.Trim().ToLower()
 
         Return status = "present" Or status = "absent" Or status = "late"
+    End Function
+
+    Function IsValidDate(dateText As String) As Boolean
+        Dim tempDate As DateTime
+        Return DateTime.TryParseExact(dateText,
+                                      "yyyy-MM-dd",
+                                      Nothing,
+                                      Globalization.DateTimeStyles.None,
+                                      tempDate)
+    End Function
+
+    Function ReadPassword() As String
+        Dim password As String = ""
+        Dim key As ConsoleKeyInfo
+
+        Do
+            key = Console.ReadKey(True)
+
+            If key.Key = ConsoleKey.Backspace AndAlso password.Length > 0 Then
+                password = password.Substring(0, password.Length - 1)
+                Console.Write(vbBack & " " & vbBack)
+
+            ElseIf key.Key <> ConsoleKey.Enter Then
+                password &= key.KeyChar
+                Console.Write("*")
+            End If
+
+        Loop While key.Key <> ConsoleKey.Enter
+
+        Console.WriteLine()
+        Return password
+    End Function
+
+    Function HashPassword(password As String) As String
+        Using sha256 As SHA256 = SHA256.Create()
+            Dim bytes As Byte() = Encoding.UTF8.GetBytes(password)
+            Dim hashBytes As Byte() = sha256.ComputeHash(bytes)
+
+            Dim builder As New StringBuilder()
+
+            For Each b As Byte In hashBytes
+                builder.Append(b.ToString("x2"))
+            Next
+
+            Return builder.ToString()
+        End Using
+    End Function
+
+    Function RecordExists(tableName As String, columnName As String, value As String) As Boolean
+        Try
+            Using conn As New MySqlConnection(connectionString)
+                conn.Open()
+
+                Dim query As String = "SELECT COUNT(*) FROM " & tableName & " WHERE " & columnName & "=@value"
+
+                Using cmd As New MySqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@value", value)
+
+                    Dim count As Integer = Convert.ToInt32(cmd.ExecuteScalar())
+                    Return count > 0
+                End Using
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine("Validation error: " & ex.Message)
+            Return False
+        End Try
+    End Function
+
+    Function AttendanceAlreadyMarked(studentId As String, courseId As String, attendanceDate As String) As Boolean
+        Try
+            Using conn As New MySqlConnection(connectionString)
+                conn.Open()
+
+                Dim query As String =
+                    "SELECT COUNT(*) FROM attendance " &
+                    "WHERE student_id=@student_id AND course_id=@course_id AND attendance_date=@date"
+
+                Using cmd As New MySqlCommand(query, conn)
+                    cmd.Parameters.AddWithValue("@student_id", studentId)
+                    cmd.Parameters.AddWithValue("@course_id", courseId)
+                    cmd.Parameters.AddWithValue("@date", attendanceDate)
+
+                    Dim count As Integer = Convert.ToInt32(cmd.ExecuteScalar())
+                    Return count > 0
+                End Using
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine("Duplicate check error: " & ex.Message)
+            Return True
+        End Try
     End Function
 
 End Module

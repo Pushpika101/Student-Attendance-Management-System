@@ -34,3 +34,4 @@
 /Users/pushpikaanuradha/Documents/GitHub/Student-Attendance-Management-System/AttendPro/bin/Debug/net10.0/runtimes/win/lib/net8.0/System.Windows.Extensions.dll
 /Users/pushpikaanuradha/Documents/GitHub/Student-Attendance-Management-System/AttendPro/obj/Debug/net10.0/AttendPro.vbproj.AssemblyReference.cache
 /Users/pushpikaanuradha/Documents/GitHub/Student-Attendance-Management-System/AttendPro/obj/Debug/net10.0/AttendPro.vbproj.Up2Date
+/Users/pushpikaanuradha/Documents/GitHub/Student-Attendance-Management-System/AttendPro/obj/Debug/net10.0/AttendPro.sourcelink.json

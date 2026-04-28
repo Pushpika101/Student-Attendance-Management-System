@@ -15,7 +15,7 @@ Imports System.Reflection
 <Assembly: System.Reflection.AssemblyCompanyAttribute("AttendPro"),  _
  Assembly: System.Reflection.AssemblyConfigurationAttribute("Debug"),  _
  Assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0"),  _
- Assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0"),  _
+ Assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+85e3427f78494527a2c81bfe19f625e760b95f1c"),  _
  Assembly: System.Reflection.AssemblyProductAttribute("AttendPro"),  _
  Assembly: System.Reflection.AssemblyTitleAttribute("AttendPro"),  _
  Assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")> 
